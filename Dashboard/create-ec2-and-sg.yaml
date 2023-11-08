@@ -1,0 +1,36 @@
+Description:  This template deploys a VPC, with a pair of public and private subnets spread
+  across two Availability Zones. It deploys an internet gateway, with a default
+  route on the public subnets.
+
+Parameters:
+  name_group-LB:
+    Description: create name security Group for Load Balancer
+    Type: String
+    Default: SG-LB,
+
+  name_group-APP:
+    Description: create name Instance
+    type: String
+    Default: SG-Apps
+
+  name_instance1:
+    Description: create name Instance 1
+    type: String
+    Default: lksapps1a
+
+  name_instance2:
+    Description: create name Instance 2
+    type: String
+    Default: lksapps1b
+
+  bash_data:
+    Description: create data for Instance
+    type: text
+  
+Resources:
+  SecurityGroup-LB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+    GroupName: !Ref name_group-LB
+    GroupDescription: "Security group with no ingress rule"
+Outputs:

@@ -1,0 +1,69 @@
+# Create a new VPC instance
+
+Description: membuat VPC untuk instance
+
+ParameterName:
+  EnvironmentName:
+    Type: string
+
+# create a new VPC instance
+  VpcCIDR:
+    Type: string
+    Default: 175.20.0.0/16
+
+# create subnet public IP address
+  PublicSubnet1CIDR:
+    Type: String
+    Default: 175.20.0.0/25
+
+  PublicSubnet2CIDR:
+    Type: String
+    Default: 175.20.0.128/25
+
+# create subnet private IP address
+  PrivateSubnet1CIDR:
+    Type: String
+    Default: 175.20.1.0/26
+  
+  PrivateSubnet2CIDR:
+    Type: String
+    Default: 175.20.1.64/26
+
+# allow to AWS account
+ResourceName:
+  Vpc-sony:
+    Type: AWS::EC2::VPC
+  Properties:
+    CidrBlock: !Ref VpcCIDR
+    EnableDnsSupport: true
+    EnableDnsHostnames: true
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref EnvironmentName
+
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      InternetGatewayId: !Ref InternetGateway
+      VpcId: !Ref Vpc-sony:
+
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc-sony:
+      AvailabilityZone: !Select [0, !GetAZs]
+      CidrBlock: !Ref PublicSubnet1CIDR
+      MapPublicIpOnLaunch: true
+  
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc-sony:
+      AvailabilityZone: !Select [0, !GetAZs]
+      CidrBlock: !Ref PublicSubnet2CIDR
+      MapPublicIpOnLaunch: true
