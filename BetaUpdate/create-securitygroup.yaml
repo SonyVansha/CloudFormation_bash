@@ -1,0 +1,37 @@
+Parameters:
+  namegroupLB:
+    Description: create name security Group for Load Balancer
+    Type: String
+    Default: SG-LB
+
+  namegroupAPP:
+    Description: create name Instance
+    Type: String
+    Default: SG-Apps
+  
+Resources:
+  MyLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref namegroupLB
+      GroupDescription: Allow inbound traffic on port 80 and 443 for Load Balancer
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 80
+          ToPort: 80
+          IpProtocol: tcp
+        - CidrIp: 0.0.0.0/0
+          FromPort: 443
+          ToPort: 443
+          IpProtocol: tcp
+
+  securitygroupApps:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Ref namegroupAPP
+      GroupDescription: create Apps Instance
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: '3000'
+          ToPort: '3000'
+          CidrIp: 0.0.0.0/0

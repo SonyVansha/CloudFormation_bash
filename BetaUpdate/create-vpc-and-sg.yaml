@@ -1,6 +1,4 @@
-Description:  This template deploys a VPC, with a pair of public and private subnets spread
-  across two Availability Zones. It deploys an internet gateway, with a default
-  route on the public subnets.
+Description:  This template deploys a VPC, Sony Vansha
 
 Parameters:
   EnvironmentName:
@@ -158,28 +156,6 @@ Resources:
       RouteTableId: !Ref PrivateRouteTable1
       SubnetId: !Ref PrivateSubnet2
 
-
-  # PrivateRouteTable2:
-  #   Type: AWS::EC2::RouteTable
-  #   Properties:
-  #     VpcId: !Ref VPC
-  #     Tags:
-  #       - Key: Name
-  #         Value: !Sub ${EnvironmentName} Private Routes (AZ2)
-
-  # PrivateSubnet2RouteTableAssociation:
-  #   Type: AWS::EC2::SubnetRouteTableAssociation
-  #   Properties:
-  #     RouteTableId: !Ref PrivateRouteTable2
-  #     SubnetId: !Ref PrivateSubnet2
-
-  # NoIngressSecurityGroup:
-  #   Type: AWS::EC2::SecurityGroup
-  #   Properties:
-  #     GroupName: "no-ingress-sg"
-  #     GroupDescription: "Security group with no ingress rule"
-  #     VpcId: !Ref VPC
-
 Outputs:
   VPC:
     Description: A reference to the created VPC
@@ -204,11 +180,3 @@ Outputs:
   PrivateSubnet1:
     Description: A reference to the private subnet in the 1st Availability Zone
     Value: !Ref PrivateSubnet1
-
-  # PrivateSubnet2:
-  #   Description: A reference to the private subnet in the 2nd Availability Zone
-  #   Value: !Ref PrivateSubnet2
-
-  # NoIngressSecurityGroup:
-  #   Description: Security group with no ingress rule
-  #   Value: !Ref NoIngressSecurityGroup
