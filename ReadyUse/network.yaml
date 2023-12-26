@@ -1,0 +1,341 @@
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 175.20.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: lksvpc
+
+  IGW:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Name
+        Value: lksigw
+
+  AttachGateway:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref IGW
+
+  SubnetPublic1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 175.20.0.0/25
+      AvailabilityZone: us-east-1a
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: subnetpublic-a
+      
+  SubnetPublic2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 175.20.0.128/25
+      AvailabilityZone: us-east-1b
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: subnetpublic-b
+
+  SubnetPrivate1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 175.20.1.0/26
+      AvailabilityZone: us-east-1a
+      Tags:
+        - Key: Name
+          Value: subnetprivate-a
+      
+  SubnetPrivate2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: 175.20.1.64/26
+      AvailabilityZone: us-east-1b
+      Tags:
+        - Key: Name
+          Value: subnetprivate-b
+
+# Route Tabele
+  RouteTablePublic:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: lkspublic
+
+  RouteTablePrivate:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Name
+        Value: lksprivate
+
+# Assosiation Subnet to Public
+  RouteTableAssociationPublic1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublic1
+      RouteTableId: !Ref RouteTablePublic
+
+  RouteTableAssociationPublic2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPublic2
+      RouteTableId: !Ref RouteTablePublic
+
+  RouteTableAssociationPrivate1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivate1
+      RouteTableId: !Ref RouteTablePrivate
+
+  RouteTableAssociationPrivate2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref SubnetPrivate2
+      RouteTableId: !Ref RouteTablePrivate
+
+# NAT Gateway
+  EIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+  
+  NATGW:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt EIP.AllocationId
+      SubnetId: !Ref SubnetPublic1
+      Tags:
+        - Key: Name
+          Value: natgw
+
+# Route to Private
+  RouteIGW:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTablePublic
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref IGW
+    
+  RouteNATGW:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref RouteTablePrivate
+      DestinationCidrBlock: '0.0.0.0/0'
+      NatGatewayId: !Ref NATGW
+
+# Security Group
+  APP:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow Port 3000
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          CidrIp: 0.0.0.0/0
+      GroupName: SG-Apps
+      Tags:
+        - Key: Name
+          Value: SG-Apps
+
+  LB:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow http to client host
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: 0.0.0.0/0
+      GroupName: SG-LB
+      Tags:
+        - Key: Name
+          Value: SG-LB
+
+# Instance
+
+  Instance1: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-0fa1ca9559f1892ec
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref APP
+      SubnetId: !Ref SubnetPrivate1
+      AvailabilityZone: us-east-1a
+      Tags:
+        - Key: Name
+          Value: lksapps1a
+      UserData: 
+        Fn::Base64: !Sub |
+            #!/bin/bash
+            printf "Install Package"
+            sudo yum install https://rpm.nodesource.com/pub_16.x/nodistro/repo/nodesource-release-nodistro-1.noarch.rpm -y
+            sudo yum install nodejs git -y
+            printf "create Direc and clone git"
+            mkdir /home/ec2-user/chartiot2023
+            git clone https://github.com/handipradana/chartiot2023.git /home/ec2-user/chartiot2023
+            printf "Create file .env and add aws access key"
+            touch /home/ec2-user/chartiot2023/.env
+            printf "AWS_ACCESS_KEY=ASIAW2WSOK7NADYQHQ43\n" >> /home/ec2-user/chartiot2023/.env
+            printf "AWS_SECRET_ACCESS_KEY=nGNPO3FDCUXX7t9GcfBk0AxPHMEA+AqH8mUv7NmT\n" >> /home/ec2-user/chartiot2023/.env
+            printf "AWS_SESSION_TOKEN=FwoGZXIvYXdzEKL//////////wEaDGsT93JJnX0wWupwrCK4AWR2Zlj8iB4PbwIwTmukgwe0KZMWiuvNZvhRRWodl+VHACbBYotIuTVxqz1FZ6PQIPwH4+YtNcxMCqlp8x1OagDVHbAaSIZbvr+X+XYtXIyDg5mmEhhqUK9BKP+BhCjBeDKtF2pJ/KKUwIRnmGIgqnTcTTlwnyB2n3qEg74keo5faiTQzsdHmpHXP7xTRaQVnOHcMSIOqmzGBwZyHRhM8uGr4z56QnuYWe/ZktojNXOTANGxwNT434colrTZqwYyLbXoeSNgfn+Bv09wcwOA59B8FoAl42Ec0iI7Uk3Q6iGsBSfrIP/VQuuFq6kG8w==\n" >> /home/ec2-user/chartiot2023/.env
+            printf "Installasi"
+            npm install --prefix /home/ec2-user/chartiot2023
+            npm run start-prod --prefix /home/ec2-user/chartiot2023
+            printf "Konfiguration Done"
+
+  Instance2: 
+    Type: AWS::EC2::Instance
+    Properties: 
+      ImageId: ami-0fa1ca9559f1892ec
+      InstanceType: t2.micro
+      SecurityGroupIds:
+        - !Ref APP
+      SubnetId: !Ref SubnetPrivate2
+      AvailabilityZone: us-east-1b
+      Tags:
+        - Key: Name
+          Value: lksapps1b
+      UserData: 
+        Fn::Base64: !Sub |
+            #!/bin/bash
+            printf "Install Package"
+            sudo yum install https://rpm.nodesource.com/pub_16.x/nodistro/repo/nodesource-release-nodistro-1.noarch.rpm -y
+            sudo yum install nodejs git -y
+            printf "create Direc and clone git"
+            mkdir /home/ec2-user/chartiot2023
+            git clone https://github.com/handipradana/chartiot2023.git /home/ec2-user/chartiot2023
+            printf "Create file .env and add aws access key"
+            touch /home/ec2-user/chartiot2023/.env
+            printf "AWS_ACCESS_KEY=ASIAW2WSOK7NADYQHQ43\n" >> /home/ec2-user/chartiot2023/.env
+            printf "AWS_SECRET_ACCESS_KEY=nGNPO3FDCUXX7t9GcfBk0AxPHMEA+AqH8mUv7NmT\n" >> /home/ec2-user/chartiot2023/.env
+            printf "AWS_SESSION_TOKEN=FwoGZXIvYXdzEKL//////////wEaDGsT93JJnX0wWupwrCK4AWR2Zlj8iB4PbwIwTmukgwe0KZMWiuvNZvhRRWodl+VHACbBYotIuTVxqz1FZ6PQIPwH4+YtNcxMCqlp8x1OagDVHbAaSIZbvr+X+XYtXIyDg5mmEhhqUK9BKP+BhCjBeDKtF2pJ/KKUwIRnmGIgqnTcTTlwnyB2n3qEg74keo5faiTQzsdHmpHXP7xTRaQVnOHcMSIOqmzGBwZyHRhM8uGr4z56QnuYWe/ZktojNXOTANGxwNT434colrTZqwYyLbXoeSNgfn+Bv09wcwOA59B8FoAl42Ec0iI7Uk3Q6iGsBSfrIP/VQuuFq6kG8w==\n" >> /home/ec2-user/chartiot2023/.env
+            printf "Installasi"
+            npm install --prefix /home/ec2-user/chartiot2023
+            npm run start-prod --prefix /home/ec2-user/chartiot2023
+            printf "Konfiguration Done"
+
+# # Target Group
+  TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      Name: TG-InstanceV2
+      TargetType: instance
+      Targets:
+        - Id: !Ref Instance1
+        - Id: !Ref Instance2
+      Port: 3000
+      Protocol: HTTP
+      VpcId: !Ref VPC
+
+# Load Balancer
+  LoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Name: lks-public-lb
+      Scheme: internet-facing
+      SecurityGroups: 
+        - !Ref LB
+      Subnets: 
+        - !Ref SubnetPublic1
+        - !Ref SubnetPublic2
+      Tags: 
+        - Key: Name
+          Value: lks-public-lb
+      Type: application
+    
+  Listener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref TargetGroup
+      LoadBalancerArn: !Ref LoadBalancer
+      Port: 80
+      Protocol: HTTP
+
+Outputs:
+  RouteTablePublic:
+    Value: !Join [ ",", [ !Ref SubnetPublic1, !Ref SubnetPublic2 ] ]
+
+  RouteTablePrivate:
+    Value: !Join [ ",", [ !Ref SubnetPrivate1, !Ref SubnetPrivate2 ] ]
+
+  VPC:
+    Description: The ID of the VPC
+    Value: !Ref VPC
+  
+  InternetGateway:
+    Description: Internet Gateway
+    Value: !Ref IGW
+  NATGateway:
+    Description: Nat Gateway
+    Value: !Ref NATGW
+
+  SubnetPublicA:
+    Description: Subnet Public A
+    Value: !Ref SubnetPublic1
+  
+  SubnetPublicB:
+    Description: Subnet Public B
+    Value: !Ref SubnetPublic2
+
+  SubnetPrivateA:
+    Description: Subnet Private A
+    Value: !Ref SubnetPrivate1
+
+  SubnetPrivateB:
+    Description: Subnet Private B
+    Value: !Ref SubnetPrivate2
+
+  TablePublic:
+    Description: Route Table Public
+    Value: !Ref RouteTablePublic
+
+  TablePrivate:
+    Description: Route Table Private
+    Value: !Ref RouteTablePrivate
+
+  lksapps1a:
+    Description: Instnace Private A
+    Value: !Ref Instance1
+
+  lksapps1b:
+    Description: Instnace Private B
+    Value: !Ref Instance2
+
+  SGLB:
+    Description: Security Group LoadBalancer
+    Value: !Ref LB
+
+  SGApps:
+    Description: Security Group APPs
+    Value: !Ref APP
+
+  TargetGroupV1:
+    Description: TG to Load Balancer
+    Value: !Ref TargetGroup
+
+  # lkspublicLB:
+  #   Description: Load Balancer
+  #   Value: !Ref LoadBalancer
